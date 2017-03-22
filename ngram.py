@@ -66,9 +66,10 @@ def language_model_score(test_grams, target_grams):
     score = 0
     for test_gram in test_grams:
         if test_gram in target_grams:
-            score *= 1/(target_grams[test_gram]/n_minus_one_gram_dict[test_gram[:n]])
+            tmp = 1/(target_grams[test_gram]/n_minus_one_gram_dict[test_gram[:n]])
+            score += log(1/(target_grams[test_gram]/n_minus_one_gram_dict[test_gram[:n]]))
     # print(score)
-    return pow(score, 1/total_test_grams)
+    return score/total_test_grams
 
 
 def get_result(train_grams, dev_grams, score_method):
@@ -92,8 +93,8 @@ def get_result(train_grams, dev_grams, score_method):
 
 def __main__():
     # Settings
-    n_of_grams = [3]
-    if_padding = True
+    n_of_grams = [4]
+    if_padding = False
     score_method = language_model_score
     train_path = '650_a3_train'
     dev_path = '650_a3_dev'
@@ -109,7 +110,7 @@ def __main__():
 
     dev_grams = {}
     for lang in dev_data:
-        grams_dict = get_grams(dev_data[lang], n_of_grams, is_padding=if_padding, is_test=if_padding)
+        grams_dict = get_grams(dev_data[lang], n_of_grams, is_padding=if_padding, is_test=True)
         dev_grams[lang] = grams_dict
 
     # Get result
