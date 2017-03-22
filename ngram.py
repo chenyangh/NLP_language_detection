@@ -2,7 +2,7 @@ from os import listdir
 from os.path import isfile, join
 import string
 from nltk.util import ngrams
-from math import log
+from math import log, pow
 
 
 def read_files(dir_path, is_using_space=True):
@@ -24,12 +24,12 @@ def read_files(dir_path, is_using_space=True):
 
 def get_grams(data, n_of_grams, is_padding=False, is_test=False):
     grams_dict = {}
-    all_grams = set()
+    all_grams = []
     for i in n_of_grams:
         for word in data.split():
             generated_ngrams = ngrams(word, i, pad_left=is_padding, pad_right=is_padding)
-            grams = set(generated_ngrams)
-            all_grams.update(grams)
+            grams = list(generated_ngrams)
+            all_grams.extend(grams)
             for gram in grams:
                 if gram not in grams_dict:
                     grams_dict[gram] = 1
@@ -52,13 +52,23 @@ def grams_tf_idf_score(test_grams, target_grams):
 
 
 def language_model_score(test_grams, target_grams):
-    total_target_grams = sum(target_grams.values())
+    total_test_grams = len(test_grams)
+    # calculate the n-1 gram
+    n = len(test_grams[0]) - 1
+    n_minus_one_gram_dict = {}
+    for gram in target_grams:
+        n_minus_one_gram = gram[:n]
+        if n_minus_one_gram not in n_minus_one_gram_dict:
+            n_minus_one_gram_dict[n_minus_one_gram] = target_grams[gram]
+        else:
+            n_minus_one_gram_dict[n_minus_one_gram] += target_grams[gram]
+
     score = 0
     for test_gram in test_grams:
         if test_gram in target_grams:
-            score += log(target_grams[test_gram]/total_target_grams)
-    print(score)
-    return score
+            score *= 1/(target_grams[test_gram]/n_minus_one_gram_dict[test_gram[:n]])
+    # print(score)
+    return pow(score, 1/total_test_grams)
 
 
 def get_result(train_grams, dev_grams, score_method):
@@ -89,12 +99,12 @@ def __main__():
     train_grams = {}
     n_of_grams = [2]
     for lang in train_data:
-        grams_dict = get_grams(train_data[lang], n_of_grams, is_padding=False)
+        grams_dict = get_grams(train_data[lang], n_of_grams, is_padding=True)
         train_grams[lang] = grams_dict
 
     dev_grams = {}
     for lang in dev_data:
-        grams_dict = get_grams(dev_data[lang], n_of_grams, is_padding=False, is_test=True)
+        grams_dict = get_grams(dev_data[lang], n_of_grams, is_padding=True, is_test=True)
         dev_grams[lang] = grams_dict
 
     get_result(train_grams, dev_grams, language_model_score)
