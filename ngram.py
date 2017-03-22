@@ -66,7 +66,6 @@ def language_model_score(test_grams, target_grams):
     score = 0
     for test_gram in test_grams:
         if test_gram in target_grams:
-            tmp = 1/(target_grams[test_gram]/n_minus_one_gram_dict[test_gram[:n]])
             score += log(1/(target_grams[test_gram]/n_minus_one_gram_dict[test_gram[:n]]))
     # print(score)
     return score/total_test_grams
