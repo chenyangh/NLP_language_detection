@@ -91,23 +91,30 @@ def get_result(train_grams, dev_grams, score_method):
 
 
 def __main__():
+    # Settings
+    n_of_grams = [3]
+    if_padding = True
+    score_method = language_model_score
     train_path = '650_a3_train'
     dev_path = '650_a3_dev'
+
+    # Read the file
     train_data = read_files(train_path)
     dev_data = read_files(dev_path)
-    # test_data = train_data['als']
+    # Get grams
     train_grams = {}
-    n_of_grams = [2]
     for lang in train_data:
-        grams_dict = get_grams(train_data[lang], n_of_grams, is_padding=True)
+        grams_dict = get_grams(train_data[lang], n_of_grams, is_padding=if_padding)
         train_grams[lang] = grams_dict
 
     dev_grams = {}
     for lang in dev_data:
-        grams_dict = get_grams(dev_data[lang], n_of_grams, is_padding=True, is_test=True)
+        grams_dict = get_grams(dev_data[lang], n_of_grams, is_padding=if_padding, is_test=if_padding)
         dev_grams[lang] = grams_dict
 
-    get_result(train_grams, dev_grams, language_model_score)
+    # Get result
+    print("The result of", score_method.__name__, "is:", end=' ')
+    get_result(train_grams, dev_grams, score_method)
 
 
 __main__()
