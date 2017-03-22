@@ -1,8 +1,8 @@
 # DONEs
 * TF-IDF match
+* n-gram language model
 
 # TODOs
-* n-gram language model
 * Smoothing
 * Minimum required input length
 * RNN language model
