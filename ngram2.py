@@ -110,7 +110,9 @@ def build_ngram(n,text,prev_model,smoothing_method,lang_name):
 	return ngram
 
 def prepare_text(n , original_content):
+	#sep1 = ' '
 	sep1 = n* ' '
+	#sep2 = sep1
 	sep2 = '$' + sep1
 	return sep1 + sep2.join(original_content.split()) + '$'
 
@@ -144,8 +146,8 @@ def get_perplexity(model, text):
 	probability = 0.0
 	for ch_ind in range(model.get_n(),len(text)):
 		ngram = text[ch_ind-model.get_n()+1:ch_ind+1]
-		if text[ch_ind]==' ' and text[ch_ind-model.get_n()+1]!= ' ':
-			continue
+		#if text[ch_ind]==' ' and text[ch_ind-model.get_n()+1]!= ' ':
+		#	continue
 		'''
 		if model.has_ngram(ngram):
 			val = model.get_probability(ngram)
@@ -238,7 +240,8 @@ def __main__():
 	# initialization
 	train_folder = '650_a3_train'
 	dev_folder = '650_a3_dev'
-	test_folder = '650_a3_dev'
+	#test_folder = '650_a3_dev'
+	test_folder = '650_a3_test_final'
 	max_n = 15
 	
 	#smoothing_method = 'None'
@@ -267,6 +270,10 @@ def __main__():
 				correct_counter+=1
 		print('correct guesses:',correct_counter,'out of:',len(best_found_langs),'for smoothing:',smoothing_method)
 
+	else:
+		for item in best_found_langs:
+			print(item[0],item[1][0])
+		
 
 
 __main__()
