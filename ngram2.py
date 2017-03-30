@@ -84,6 +84,9 @@ class NGram:
 		else:# Katz
 			if ngram not in self.__grams:# count == 0, case 1
 				partial_token = ngram[1:]
+				print(self.__n,'is n')
+				if self.__n==0:
+					return 0
 				p2 = self.__prev_model.get_probability(partial_token)
 				seen_token = ngram[:-1]
 				beta = self.compute_beta(seen_token)
@@ -92,14 +95,20 @@ class NGram:
 				alpha = beta
 				self.__alpha_normalize+= (p2)
 				return alpha*p2
-
+			#else:
 			elif self.__grams[ngram][0]<self.__katz_k:# 0<count<k case 2
 				count = self.get_the_count(ngram,self.__n)
 				Nr_p1 = self.get_N_freq_of_r(count+1)
 				Nr = self.get_N_freq_of_r(count)
 				return (count * Nr_p1)/(Nr * self.get_total_N_count())
+				#print('count',count,'Nr_p1',Nr_p1,'Nr',Nr,'total',self.get_total_N_count())
+				#if Nr_p1!=0:
+				#	return (count * Nr_p1)/(Nr * self.get_total_N_count())
+				#else:
+				#	return count /( self.get_total_N_count())
 			else:# k<count, case 3
 				seen_token = ngram[:-1]
+				#print('count',self.__grams[ngram][0],'seen count',self.__prev_model.get_the_count(seen_token,self.__n-1))
 				return self.__grams[ngram][0]/self.__prev_model.get_the_count(seen_token,self.__n-1)
 
 	def update_alpha(self):
@@ -112,9 +121,10 @@ class NGram:
 			return self.__alpha_normalize
 
 	def compute_beta(self,seen_token):
-		temp= 1- sum([self.get_probability(x) for x in self.__grams if self.__grams[x][0]>self.__katz_k])
+		temp = 1- sum([self.get_probability(x) for x in self.__grams if x[:-1]==seen_token])
 		if temp<=0:
-			raise Exception('Sum of probability more than 1!',temp)
+			#raise Exception('Sum of probability more than 1!',temp)
+			return 0
 		return temp
 
 	def set_max_possible_katz_k(self):
@@ -144,6 +154,14 @@ class NGram:
 			return self.__N_freq[r]
 		else:
 			return 0
+
+	def update_unknown(self):
+		total = 0
+		for item_key,val in self.__grams.items():
+			if val[0]<MIN_COUNT:
+				total+=val[0]
+			del item_key
+		self.__grams['UNK'] = [total]
 
 	def get_total_N_count(self):
 		total_count = 0
@@ -189,6 +207,7 @@ def build_ngram(n,text,prev_model,smoothing_method,lang_name):
 		token = text[ch_ind-n+1:ch_ind+1]	# app in apple
 		# seen_token = text[:] # ap in apple
 		ngram.add_to_the_count(token)
+	ngram.update_unknown()
 	if n==1:
 		ngram.set_vocab_size(ngram.get_number_of_ngrams())
 	ngram.compute_probabilities(prev_model)
@@ -216,7 +235,7 @@ def build_lang_models(file_obj,max_n,smoothing_method,lang_name):
 		print('lang:',lang_name,'n in ngram:',n,'number of ngrams seen:',model.get_number_of_ngrams())
 		if smoothing_method=='Katz':
 			model.build_N_freq()
-			model.print_N_freq()
+			#model.print_N_freq()
 			model.set_max_possible_katz_k()
 	return models
 
@@ -261,7 +280,7 @@ def get_perplexity(model, text):
 		if val==0:
 			print('ngram not found:',token)
 			return 999999
-		print('val is',val)
+		#print('val is',val)
 		probability += math.log(val)
 		
 	#N = len(re.sub('[\s+]',' ',text))
@@ -337,6 +356,7 @@ def test(test_folder,lang_models, best_models_indices):
 ############################### main ###############################
 
 KATZ_K = 5
+MIN_COUNT = 5
 def __main__():
 	# initialization
 	train_folder = '650_a3_train'
