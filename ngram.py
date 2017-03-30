@@ -14,7 +14,7 @@ def read_files(dir_path, is_using_space=True):
     for file in files:
         lang = file.split('.')[0].split('-')[1]
         voc = set()
-        with open(join(dir_path, file)) as f:
+        with open(join(dir_path, file), 'r', encoding="utf-8") as f:
             text = f.read()
             # Remove  punctuation TODO: remove Space?
             if is_using_space:
@@ -80,7 +80,7 @@ def language_model_score(train_lang, test_grams, target_grams):
             if test_gram in target_grams:
                 score += log(1/(target_grams[test_gram]/n_minus_one_gram_dict[test_gram[:n]]))
             else:
-                return 0
+                return 100000000
     elif smoothing == "Laplace":
         for test_gram in test_grams:
             if test_gram in target_grams:
@@ -117,13 +117,26 @@ def get_result(train_grams, dev_grams, score_method):
         total_target_grams = len(train_grams[test_lang])
         if lang2 == lang1:
             correct += 1
-        print(lang1, lang2, min_val, str(total_target_grams))
+
     print(correct / len(dev_grams))
+
+def get_N_r(gram_dict):
+    k = 7
+    N_r = {}
+    for i in range(k):
+        N_r[i+1] = 0
+
+    for gram in gram_dict:
+        if gram_dict[gram] <= k:
+            N_r[gram_dict[gram]] += 1
+
+    # print(N_r)
+    return N_r
 
 
 def __main__():
     # Settings
-    n_of_grams = [3]
+    n_of_grams = [2]
     if_padding = True
     score_method = language_model_score
     train_path = '../650_a3_train'
@@ -137,6 +150,16 @@ def __main__():
     for lang in train_data:
         grams_dict = get_grams(train_data[lang], n_of_grams, is_padding=if_padding)
         train_grams[lang] = grams_dict
+
+
+
+    for lang in train_grams:
+        to_test = set(get_N_r(train_grams[lang]).values())
+        # print(to_test)
+        if 0 in to_test:
+            print('wrong')
+
+
 
     dev_grams = {}
     for lang in dev_data:
