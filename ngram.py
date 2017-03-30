@@ -95,8 +95,8 @@ def __main__():
     n_of_grams = [4]
     if_padding = False
     score_method = language_model_score
-    train_path = '650_a3_train'
-    dev_path = '650_a3_dev'
+    train_path = '../650_a3_train'
+    dev_path = '../650_a3_dev'
 
     # Read the file
     train_data = read_files(train_path)
