@@ -11,8 +11,12 @@ class NGram:
 		self.__n = n
 		self.__name = name
 		self.__smoothing_method = smoothing_method
+		self.__alpha_normalize = 0.0
+		self.__alpha_denom = 1.0
+		self.__katz_k = 0
 		if n==0:
 			self.__total_letter_count = total_letter_count
+			#self.__alpha_normalize = 1.0
 		else:
 			pass
 
@@ -39,18 +43,18 @@ class NGram:
 			#print('token:',token,'size:',self.__n)
 			#raise Exception("Gram was supposed to be available:"+str(token)+"END")
 
-	def compute_probabilities(self,prev_model,smoothing_method):
+	def compute_probabilities(self,prev_model):
 		self.__prev_model = prev_model
 		for token in self.__grams:
 			partial_token = token[:-1]
 			#if partial_token=='':
 			#	print('empty partial_token going on', 'token is:',token,'END')
-			if smoothing_method=='None':
+			if self.__smoothing_method=='None':
 				if prev_model.get_the_count(partial_token,self.__n-1)==0:
 					print('ERROR',self.__grams[token][0],prev_model.get_the_count(partial_token,self.__n-1),token,self.__name)
 					sys.stdout.flush()
 				self.__grams[token].append( self.__grams[token][0]/prev_model.get_the_count(partial_token,self.__n-1))
-			elif smoothing_method=='Laplace':
+			elif self.__smoothing_method=='Laplace':
 				if token in self.__grams:
 					numerator = self.__grams[token][0] + 1
 				else:
@@ -62,7 +66,6 @@ class NGram:
 
 
 	def get_probability(self,ngram):
-			#raise Exception('why are you asking for an unavailable ngram??')
 		if self.__smoothing_method=='None':
 			if ngram not in self.__grams:
 				return 0
@@ -77,21 +80,50 @@ class NGram:
 				return 1/(self.__prev_model.get_the_count(partial_token,self.__n-1) + self.get_vocab_size())
 			else:
 				return self.__grams[ngram][1]
+
 		else:# Katz
 			if ngram not in self.__grams:# count == 0, case 1
-				pass
-			elif 	self.__grams[ngram][1]<KATZ_K:# 0<count<k case 2
-				pass
-			else:# k<count, case 3
-				return self.__grams[ngram][1]
+				partial_token = ngram[1:]
+				p2 = self.__prev_model.get_probability(partial_token)
+				seen_token = ngram[:-1]
+				beta = self.compute_beta(seen_token)
+				print('HEY!',self.__prev_model.__alpha_normalize,'prev n is:',self.__n-1)
+				#alpha = beta/self.__alpha_normalize
+				alpha = beta
+				self.__alpha_normalize+= (p2)
+				return alpha*p2
 
-	def get_max_possible_katz_k(self):
+			elif self.__grams[ngram][0]<self.__katz_k:# 0<count<k case 2
+				count = self.get_the_count(ngram,self.__n)
+				Nr_p1 = self.get_N_freq_of_r(count+1)
+				Nr = self.get_N_freq_of_r(count)
+				return (count * Nr_p1)/(Nr * self.get_total_N_count())
+			else:# k<count, case 3
+				seen_token = ngram[:-1]
+				return self.__grams[ngram][0]/self.__prev_model.get_the_count(seen_token,self.__n-1)
+
+	def update_alpha(self):
+		self.__alpha_denom = self.__alpha_normalize
+
+	def get_katz_normalization(self):
+		if self.__alpha_normalize == 0.0:
+			return 1
+		else:
+			return self.__alpha_normalize
+
+	def compute_beta(self,seen_token):
+		temp= 1- sum([self.get_probability(x) for x in self.__grams if self.__grams[x][0]>self.__katz_k])
+		if temp<=0:
+			raise Exception('Sum of probability more than 1!',temp)
+		return temp
+
+	def set_max_possible_katz_k(self):
 		new_k = 1
 		while True:
 			if new_k not in self.__N_freq:
 				break
 			new_k +=1
-		return new_k-1
+		self.__katz_k= new_k-2 # since each of these need N(r+1), so that should also exist!
 
 	def build_N_freq(self):
 		for gram in self.__grams:
@@ -112,6 +144,12 @@ class NGram:
 			return self.__N_freq[r]
 		else:
 			return 0
+
+	def get_total_N_count(self):
+		total_count = 0
+		for key,val in self.__N_freq.items():
+			total_count += key*val
+		return total_count
 
 	def get_number_of_ngrams(self):
 		return len(self.__grams)
@@ -153,7 +191,7 @@ def build_ngram(n,text,prev_model,smoothing_method,lang_name):
 		ngram.add_to_the_count(token)
 	if n==1:
 		ngram.set_vocab_size(ngram.get_number_of_ngrams())
-	ngram.compute_probabilities(prev_model,smoothing_method)
+	ngram.compute_probabilities(prev_model)
 	#print(ngram)
 	return ngram
 
@@ -179,6 +217,7 @@ def build_lang_models(file_obj,max_n,smoothing_method,lang_name):
 		if smoothing_method=='Katz':
 			model.build_N_freq()
 			model.print_N_freq()
+			model.set_max_possible_katz_k()
 	return models
 
 
@@ -222,9 +261,11 @@ def get_perplexity(model, text):
 		if val==0:
 			print('ngram not found:',token)
 			return 999999
+		print('val is',val)
 		probability += math.log(val)
 		
 	#N = len(re.sub('[\s+]',' ',text))
+	probability = probability/model.get_katz_normalization()
 	perplexity = math.exp((-1*probability)/N)
 	return perplexity
 
@@ -305,9 +346,8 @@ def __main__():
 	max_n = 4
 	
 	#smoothing_method = 'None'
-	smoothing_method = 'Laplace'
-	# TODO:
-	#smoothing_method = 'Katz' 
+	#smoothing_method = 'Laplace'
+	smoothing_method = 'Katz' 
 	
 	# for each language, we need ngrams for n = [1,2,...], then test!
 	lang_models = {} # key=language, value=list of ngrams, where item 1 is unigram and so on, each of them a obj is kept.
