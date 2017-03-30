@@ -7,6 +7,7 @@ import sys
 class NGram:
 	def __init__(self,n,total_letter_count, name,smoothing_method):
 		self.__grams = {}# a dictionary, for each token, keep a list, first value in it the count, second the probability
+		self.__N_freq = {} # keeps how many times each frequency has occured.
 		self.__n = n
 		self.__name = name
 		self.__smoothing_method = smoothing_method
@@ -61,19 +62,56 @@ class NGram:
 
 
 	def get_probability(self,ngram):
-		if ngram not in self.__grams:
 			#raise Exception('why are you asking for an unavailable ngram??')
-			if self.__smoothing_method=='None':
+		if self.__smoothing_method=='None':
+			if ngram not in self.__grams:
 				return 0
-			elif self.__smoothing_method=='Laplace':
+			else:
+				return self.__grams[ngram][1]
+
+		elif self.__smoothing_method=='Laplace':
+			if ngram not in self.__grams:
 				partial_token = ngram[:-1]
 				#if self.__n==15:
 				#	print('Not in the train set, moving to prev_model:',ngram,'prev:',partial_token)
 				return 1/(self.__prev_model.get_the_count(partial_token,self.__n-1) + self.get_vocab_size())
-			else:# Katz
+			else:
+				return self.__grams[ngram][1]
+		else:# Katz
+			if ngram not in self.__grams:# count == 0, case 1
 				pass
+			elif 	self.__grams[ngram][1]<KATZ_K:# 0<count<k case 2
+				pass
+			else:# k<count, case 3
+				return self.__grams[ngram][1]
+
+	def get_max_possible_katz_k(self):
+		new_k = 1
+		while True:
+			if new_k not in self.__N_freq:
+				break
+			new_k +=1
+		return new_k-1
+
+	def build_N_freq(self):
+		for gram in self.__grams:
+			count = self.__grams[gram][0]
+			if count in self.__N_freq:
+				self.__N_freq[count] +=1
+			else:
+				self.__N_freq[count]=1
+	def print_N_freq(self):
+		print('Lang:',self.__name)
+		#d = sorted(self.__N_freq,key = lambda x:self.__N_freq[x])
+		print(self.__N_freq)
+		for key in sorted(self.__N_freq):
+			print(key,"seen:",self.__N_freq[key],'bigrams having this frequency')
+
+	def get_N_freq_of_r(self, r):
+		if r in self.__N_freq:
+			return self.__N_freq[r]
 		else:
-			return self.__grams[ngram][1]
+			return 0
 
 	def get_number_of_ngrams(self):
 		return len(self.__grams)
@@ -138,6 +176,9 @@ def build_lang_models(file_obj,max_n,smoothing_method,lang_name):
 		model = build_ngram(n, text, models[-1],smoothing_method,lang_name)
 		models.append(model)
 		print('lang:',lang_name,'n in ngram:',n,'number of ngrams seen:',model.get_number_of_ngrams())
+		if smoothing_method=='Katz':
+			model.build_N_freq()
+			model.print_N_freq()
 	return models
 
 
@@ -179,7 +220,7 @@ def get_perplexity(model, text):
 		N +=1
 		val = model.get_probability(token)
 		if val==0:
-			#print('ngram not found:',ngram)
+			print('ngram not found:',token)
 			return 999999
 		probability += math.log(val)
 		
@@ -254,6 +295,7 @@ def test(test_folder,lang_models, best_models_indices):
 
 ############################### main ###############################
 
+KATZ_K = 5
 def __main__():
 	# initialization
 	train_folder = '650_a3_train'
@@ -272,7 +314,7 @@ def __main__():
 	
 	# training
 	lang_models = train(train_folder,max_n,smoothing_method)
-
+	
 	# use development set to find best Ns for each language. Also may need to do sth for smoothing method
 	best_models_indices = dev(dev_folder,lang_models)
 	print('best models (# in n in ngram):', best_models_indices)
@@ -293,7 +335,7 @@ def __main__():
 	else:
 		for item in best_found_langs:
 			print(item[0],item[1][0])
-		
+	
 
 
 __main__()
