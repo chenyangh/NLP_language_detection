@@ -84,9 +84,9 @@ class NGram:
 		else:# Katz
 			if ngram not in self.__grams:# count == 0, case 1
 				partial_token = ngram[1:]
-				print(self.__n,'is n')
+				#print(self.__n,'is n')
 				if self.__n==0:
-					return 0
+					return self.get_vocab_size()
 				p2 = self.__prev_model.get_probability(partial_token)
 				seen_token = ngram[:-1]
 				beta = self.compute_beta(seen_token)
@@ -94,13 +94,23 @@ class NGram:
 				#alpha = beta/self.__alpha_normalize
 				alpha = beta
 				self.__alpha_normalize+= (p2)
+				if alpha*p2 ==0:
+					print('probability zero: alpha',alpha,'p2',p2)
 				return alpha*p2
 			#else:
-			elif self.__grams[ngram][0]<self.__katz_k:# 0<count<k case 2
+			elif len(self.__grams[ngram])>1:
+				return self.__grams[ngram][1]
+
+			elif self.__grams[ngram][0]<=self.__katz_k:# 0<count<k case 2
 				count = self.get_the_count(ngram,self.__n)
 				Nr_p1 = self.get_N_freq_of_r(count+1)
 				Nr = self.get_N_freq_of_r(count)
-				return (count * Nr_p1)/(Nr * self.get_total_N_count())
+				num = (count * Nr_p1)/(Nr * self.get_total_N_count())
+				denom = self.__prev_model.get_probability(ngram[:-1])
+				if num/denom==0:
+					print('probability zero: num',num,'denom',denom)
+				self.__grams[ngram].append(self.__max_katz_ratio*num/denom)
+				return self.__max_katz_ratio*num/denom
 				#print('count',count,'Nr_p1',Nr_p1,'Nr',Nr,'total',self.get_total_N_count())
 				#if Nr_p1!=0:
 				#	return (count * Nr_p1)/(Nr * self.get_total_N_count())
@@ -109,7 +119,9 @@ class NGram:
 			else:# k<count, case 3
 				seen_token = ngram[:-1]
 				#print('count',self.__grams[ngram][0],'seen count',self.__prev_model.get_the_count(seen_token,self.__n-1))
-				return self.__grams[ngram][0]/self.__prev_model.get_the_count(seen_token,self.__n-1)
+				t = self.__grams[ngram][0]/self.__prev_model.get_the_count(seen_token,self.__n-1)
+				self.__grams[ngram].append(t)
+				return t
 
 	def update_alpha(self):
 		self.__alpha_denom = self.__alpha_normalize
@@ -121,7 +133,7 @@ class NGram:
 			return self.__alpha_normalize
 
 	def compute_beta(self,seen_token):
-		temp = 1- sum([self.get_probability(x) for x in self.__grams if x[:-1]==seen_token])
+		temp = 1- sum([self.get_probability(x) for x in self.__grams if x[:-1]==seen_token and self.__grams[x][0]>self.__katz_k])
 		if temp<=0:
 			#raise Exception('Sum of probability more than 1!',temp)
 			return 0
@@ -133,6 +145,11 @@ class NGram:
 			if new_k not in self.__N_freq:
 				break
 			new_k +=1
+		if new_k>2:		
+			#self.__max_katz_ratio = self.__N_freq[new_k-1]/self.__N_freq[new_k-2]
+			self.__max_katz_ratio = 0.9**self.__n
+		else:
+			self.__max_katz_ratio = 0.9**self.__n
 		self.__katz_k= new_k-2 # since each of these need N(r+1), so that should also exist!
 
 	def build_N_freq(self):
@@ -156,6 +173,7 @@ class NGram:
 			return 0
 
 	def update_unknown(self):
+		return
 		total = 0
 		for item_key,val in self.__grams.items():
 			if val[0]<MIN_COUNT:
@@ -363,7 +381,7 @@ def __main__():
 	dev_folder = '650_a3_dev'
 	test_folder = '650_a3_dev'
 	#test_folder = '650_a3_test_final'
-	max_n = 4
+	max_n = 6
 	
 	#smoothing_method = 'None'
 	#smoothing_method = 'Laplace'
@@ -377,6 +395,24 @@ def __main__():
 	
 	# use development set to find best Ns for each language. Also may need to do sth for smoothing method
 	best_models_indices = dev(dev_folder,lang_models)
+	print('best models (# in n in ngram):', best_models_indices)
+	
+	best_indices = {}
+
+	# assign most frequent n in ngram to all languages
+	for a,index in best_models_indices.items():
+		if index in best_indices:
+			best_indices[index]+=1
+		else:
+			best_indices[index]=1
+	max_ = 0
+	key = 0
+	for key,val in best_indices.items():
+		if val>max_:
+			max_ = val
+			ind = key
+	for key in best_models_indices:
+		best_models_indices[key] = ind
 	print('best models (# in n in ngram):', best_models_indices)
 
 	# test
