@@ -32,17 +32,19 @@ def read_files(dir_path, is_using_space=True):
 
 def get_grams(data, n_of_grams, is_padding=False, is_test=False):
     grams_dict = {}
-    all_grams = []
+    all_grams = {}
     for i in n_of_grams:
+        grams_dict[i] = {}
+        all_grams[i] = []
         for word in data.split():
             generated_ngrams = ngrams(word, i, pad_left=is_padding, pad_right=False)
             grams = list(generated_ngrams)
-            all_grams.extend(grams)
+            all_grams[i].extend(grams)
             for gram in grams:
-                if gram not in grams_dict:
-                    grams_dict[gram] = 1
+                if gram not in grams_dict[i]:
+                    grams_dict[i][gram] = 1
                 else:
-                    grams_dict[gram] += 1
+                    grams_dict[i][gram] += 1
     if is_test:
         return all_grams
     else:
@@ -88,24 +90,24 @@ def good_turing(N_r, r):
     return (r+1) * N_r[r+1] / N_r[r]
 
 
-def back_off(gram, n):
-    pass
+def back_off(test_gram, target_grams, choice_n):
+    if choice_n == 1:
+        pass
 
 
-def language_model_score(train_lang, test_grams, target_grams):
+
+def language_model_score(train_lang, test_grams_n, target_grams_n, choice_n):
     global voc_size
+    test_grams = test_grams_n[choice_n]
+    target_grams = target_grams_n[choice_n]
 
     total_test_grams = len(test_grams)
     # calculate the n-1 gram
     n_minus_one = len(test_grams[0]) - 1
-    n_minus_one_gram_dict = get_less_one_gram(target_grams, n_minus_one)
+    if choice_n == 1:
+        return 0
+    n_minus_one_gram_dict = target_grams[choice_n-1]
 
-    for gram in target_grams:
-        n_minus_one_gram = gram[:n_minus_one]
-        if n_minus_one_gram not in n_minus_one_gram_dict:
-            n_minus_one_gram_dict[n_minus_one_gram] = target_grams[gram]
-        else:
-            n_minus_one_gram_dict[n_minus_one_gram] += target_grams[gram]
 
     score = 0
     if smoothing == "None":
@@ -137,17 +139,14 @@ def language_model_score(train_lang, test_grams, target_grams):
                 cn = target_grams[test_gram]
                 if cn > k:
                     cn_minus_one = n_minus_one_gram_dict[test_gram[:n_minus_one]]
-                    score += log(
-                        (cn + 1) /
-                        (cn_minus_one + voc_size[train_lang])
-                    )
+                    score += log(cn / cn_minus_one)
                 else:  # 0 < cn <= k
                     # using good turning
                     N_r = get_N_r(target_grams, k)
                     r = cn
                     c_star = good_turing(N_r, r)
                     cn_minus_one = n_minus_one_gram_dict[test_gram[:n_minus_one]]
-                    score += log( c_star / cn_minus_one )
+                    score += log(c_star / cn_minus_one)
             else:   # cn == 0
                 cn = 0
                 N_r = get_N_r(target_grams, k)
@@ -166,7 +165,7 @@ def language_model_score(train_lang, test_grams, target_grams):
 
                 beta = 1 - beta
                 alpha = 1 - beta
-
+                back_off(test_gram, target_grams_n, choice_n - 1)
 
 
                 r = cn
@@ -178,7 +177,7 @@ def language_model_score(train_lang, test_grams, target_grams):
     return exp(score/total_test_grams)
 
 
-def get_result(train_grams, dev_grams, score_method):
+def get_result(train_grams, dev_grams, choice_n):
     correct = 0
     for test_lang in dev_grams:
         lang1 = test_lang
@@ -187,7 +186,7 @@ def get_result(train_grams, dev_grams, score_method):
 
         for target_lang in train_grams:
 
-            val = score_method(target_lang, dev_grams[test_lang], train_grams[target_lang])
+            val = language_model_score(target_lang, dev_grams[test_lang], train_grams[target_lang], choice_n)
             if val < min_val:
                 min_val = val
                 lang2 = target_lang
@@ -201,9 +200,10 @@ def get_result(train_grams, dev_grams, score_method):
 
 def __main__():
     # Settings
-    n_of_grams = [2]
+    choice_n = 5
+    n_of_grams = [1, 2, 3, 4, 5]
     if_padding = True
-    score_method = language_model_score
+    # score_method = language_model_score
     train_path = '650_a3_train'
     dev_path = '650_a3_dev'
 
@@ -228,8 +228,8 @@ def __main__():
         dev_grams[lang] = grams_dict
 
     # Get result
-    print("The result of", score_method.__name__, "is:", end=' ')
-    get_result(train_grams, dev_grams, score_method)
+    print("The dev accuracy of", choice_n, "gram", "is:", end=' ')
+    get_result(train_grams, dev_grams, choice_n)
 
 
 __main__()
